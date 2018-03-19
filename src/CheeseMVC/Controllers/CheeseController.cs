@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using CheeseMVC.ViewModels;
 using CheeseMVC.Data;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 
 namespace CheeseMVC.Controllers
 {
     public class CheeseController : Controller
     {
-        private CheeseDbContext context;
+        private readonly CheeseDbContext context;
 
         public CheeseController(CheeseDbContext dbContext)
         {
@@ -19,14 +20,14 @@ namespace CheeseMVC.Controllers
         // GET: /<controller>/
         public IActionResult Index()
         {
-            List<Cheese> cheeses = context.Cheeses.ToList();
+            IList<Cheese> cheeses = context.Cheeses.Include(c => c.Category).ToList();
 
             return View(cheeses);
         }
 
         public IActionResult Add()
         {
-            AddCheeseViewModel addCheeseViewModel = new AddCheeseViewModel();
+            AddCheeseViewModel addCheeseViewModel = new AddCheeseViewModel(context.Categories.ToList());
             return View(addCheeseViewModel);
         }
 
@@ -36,11 +37,13 @@ namespace CheeseMVC.Controllers
             if (ModelState.IsValid)
             {
                 // Add the new cheese to my existing cheeses
+                CheeseCategory newCheeseCategory = context.Categories.Single(c => c.ID == addCheeseViewModel.CategoryID);
                 Cheese newCheese = new Cheese
                 {
                     Name = addCheeseViewModel.Name,
                     Description = addCheeseViewModel.Description,
-                    Type = addCheeseViewModel.Type
+                    Category = newCheeseCategory
+                    //CategoryID = addCheeseViewModel.CategoryID,
                 };
 
                 context.Cheeses.Add(newCheese);
@@ -71,6 +74,23 @@ namespace CheeseMVC.Controllers
             context.SaveChanges();
 
             return Redirect("/");
+        }
+
+        //in the video
+        public IActionResult Category(int id)
+        {
+            if (id == 0)
+            {
+                return Redirect("/Category");
+            }
+
+            CheeseCategory theCategory = context.Categories
+                .Include(cat => cat.Cheeses)
+                .Single(cat => cat.ID == id);
+
+            ViewBag.title = "Cheeses in category: " + theCategory.Name;
+
+            return View("Index", theCategory.Cheeses);
         }
     }
 }
